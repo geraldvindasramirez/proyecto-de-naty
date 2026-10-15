@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interfaz - Lector ContaFacil</title>
+    <!-- Librería SheetJS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 400px;
+            text-align: center;
+        }
+        input[type="text"], input[type="password"] {
+            width: 90%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .hidden {
+            display: none;
+        }
+        .info-box {
+            background: #e9ecef;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            padding: 12px;
+            margin-top: 15px;
+            text-align: left;
+            font-size: 14px;
+            max-height: 220px;
+            overflow-y: auto;
+        }
+        .info-box h4 {
+            margin: 0 0 8px 0;
+            color: #333;
+            text-align: center;
+        }
+        .record-item {
+            border-bottom: 1px solid #ccc;
+            padding: 6px 0;
+        }
+        .record-item:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Pantalla de Login -->
+    <div id="login-screen" class="container">
+        <h2>Iniciar Sesión</h2>
+        <form onsubmit="handleLogin(event)">
+            <input type="text" placeholder="Usuario" required>
+            <input type="password" placeholder="Contraseña" required>
+            <button type="submit">Ingresar</button>
+        </form>
+    </div>
+
+    <!-- Pantalla de Menú -->
+    <div id="menu-screen" class="container hidden">
+        <h2>Menú Principal</h2>
+        <p>¡Bienvenido al sistema!</p>
+        
+        <input type="file" id="excel-file" accept=".xlsx, .xlsm, .xls" style="display: none;" onchange="leerExcel(event)">
+        <button onclick="document.getElementById('excel-file').click()">📂 Cargar ContaFacil_Historicos</button>
+
+        <div id="info-display" class="info-box hidden">
+            <h4>Resumen de Ingresos</h4>
+            <div id="results-container"></div>
+        </div>
+
+        <!-- Botón para descargar el Excel filtrado -->
+        <div id="section-descargar" class="hidden">
+            <button onclick="descargarExcelFiltrado()" style="background-color: #28a745; margin-top: 15px;">💾 Descargar Trimestre, Año e Ingresos</button>
+        </div>
+
+        <br>
+        <button onclick="handleLogout()" style="background-color: #dc3545; margin-top: 10px;">Cerrar Sesión</button>
+    </div>
+
+    <script>
+        let datosFiltradosParaGuardar = [];
+        let nombreArchivoOriginal = "Reporte_Trimestral.xlsx";
+
+        function handleLogin(event) {
+            event.preventDefault();
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('menu-screen').classList.remove('hidden');
+        }
+
+        function handleLogout() {
+            document.getElementById('menu-screen').classList.add('hidden');
+            document.getElementById('login-screen').classList.remove('hidden');
+            document.getElementById('info-display').classList.add('hidden');
+            document.getElementById('section-descargar').classList.add('hidden');
+            document.getElementById('excel-file').value = '';
+            datosFiltradosParaGuardar = [];
+        }
+
+        function leerExcel(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            nombreArchivoOriginal = file.name;
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    const sheetName = workbook.SheetNames.includes("Ingresos_Mensuales") 
+                                      ? "Ingresos_Mensuales" 
+                                      : workbook.SheetNames[0];
+                    
+                    const worksheet = workbook.Sheets[sheetName];
+                    const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                    const resultsContainer = document.getElementById('results-container');
+                    resultsContainer.innerHTML = "";
+
+                    // Reiniciamos el arreglo limpio y añadimos la cabecera deseada
+                    datosFiltradosParaGuardar = [["Trimestre", "Año", "Ingresos"]];
+
+                    let count = 0;
+                    for (let i = 3; i < json.length; i++) {
+                        const row = json[i];
+                        
+                        if (row && (row[0] !== undefined || row[1] !== undefined)) {
+                            const anio = row[0] !== undefined ? row[0] : "";
+                            const mes = row[1] !== undefined ? row[1] : "";
+                            const ingresos = row[2] !== undefined ? row[2] : 0;
+
+                            // Función auxiliar opcional para calcular el trimestre basado en el mes si no viene directo en el excel
+                            // (Asumiendo nombres de meses en texto o puedes adaptarlo si tus columnas varían)
+                            let trimestre = obtenerTrimestre(mes);
+
+                            // Guardamos la fila filtrada para el nuevo Excel: [Trimestre, Año, Ingresos]
+                            datosFiltradosParaGuardar.push([trimestre, anio, ingresos]);
+
+                            // Mostramos en la interfaz
+                            const itemDiv = document.createElement('div');
+                            itemDiv.className = 'record-item';
+                            itemDiv.innerHTML = `
+                                <strong>Trimestre:</strong> ${trimestre} | <strong>Año:</strong> ${anio}<br>
+                                <strong>Ingresos:</strong> ₡${Number(ingresos).toLocaleString()}
+                            `;
+                            resultsContainer.appendChild(itemDiv);
+                            count++;
+                        }
+                    }
+
+                    if (count === 0) {
+                        resultsContainer.innerHTML = "<p>No se encontraron registros en las filas esperadas.</p>";
+                    }
+
+                    document.getElementById('info-display').classList.remove('hidden');
+                    document.getElementById('section-descargar').classList.remove('hidden');
+
+                } catch (error) {
+                    alert("Error al leer el archivo: " + error.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Función auxiliar para determinar el trimestre según el mes (puedes ajustarla según los datos de tu Excel)
+        function obtenerTrimestre(mesTexto) {
+            if (!mesTexto) return "N/D";
+            const m = mesTexto.toString().toLowerCase().trim();
+            if (["enero", "febrero", "marzo"].includes(m)) return "T1";
+            if (["abril", "mayo", "junio"].includes(m)) return "T2";
+            if (["julio", "agosto", "septiembre"].includes(m)) return "T3";
+            if (["octubre", "noviembre", "diciembre"].includes(m)) return "T4";
+            return mesTexto; // Si ya viene especificado como "T1", "T2", etc., lo devuelve tal cual
+        }
+
+        function descargarExcelFiltrado() {
+            if (datosFiltradosParaGuardar.length <= 1) {
+                alert("No hay datos suficientes para generar el archivo.");
+                return;
+            }
+
+            // Creamos un nuevo libro de trabajo y una hoja basada únicamente en nuestro arreglo filtrado
+            const nuevoLibro = XLSX.utils.book_new();
+            const nuevaHoja = XLSX.utils.aoa_to_sheet(datosFiltradosParaGuardar);
+            
+            XLSX.utils.book_append_sheet(nuevoLibro, nuevaHoja, "Resumen_Trimestral");
+
+            // Forzamos la descarga del nuevo archivo clonado y reducido
+            XLSX.writeFile(nuevoLibro, "Trimestral_" + nombreArchivoOriginal);
+            alert("¡Archivo clonado y filtrado descargado con éxito!");
+        }
+    </script>
+
+</body>
+</html>
