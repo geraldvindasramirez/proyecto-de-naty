@@ -108,7 +108,6 @@
 
     <script>
         let datosFiltradosParaGuardar = [];
-        let nombreArchivoOriginal = "Reporte_Trimestral.xlsx";
 
         function handleLogin(event) {
             event.preventDefault();
@@ -129,7 +128,6 @@
             const file = event.target.files[0];
             if (!file) return;
 
-            nombreArchivoOriginal = file.name;
             const reader = new FileReader();
             
             reader.onload = function(e) {
@@ -159,11 +157,9 @@
                             const mes = row[1] !== undefined ? row[1] : "";
                             const ingresos = row[2] !== undefined ? row[2] : 0;
 
-                            // Función auxiliar opcional para calcular el trimestre basado en el mes si no viene directo en el excel
-                            // (Asumiendo nombres de meses en texto o puedes adaptarlo si tus columnas varían)
                             let trimestre = obtenerTrimestre(mes);
 
-                            // Guardamos la fila filtrada para el nuevo Excel: [Trimestre, Año, Ingresos]
+                            // Guardamos la fila filtrada para el nuevo Excel
                             datosFiltradosParaGuardar.push([trimestre, anio, ingresos]);
 
                             // Mostramos en la interfaz
@@ -192,7 +188,6 @@
             reader.readAsArrayBuffer(file);
         }
 
-        // Función auxiliar para determinar el trimestre según el mes (puedes ajustarla según los datos de tu Excel)
         function obtenerTrimestre(mesTexto) {
             if (!mesTexto) return "N/D";
             const m = mesTexto.toString().toLowerCase().trim();
@@ -200,7 +195,7 @@
             if (["abril", "mayo", "junio"].includes(m)) return "T2";
             if (["julio", "agosto", "septiembre"].includes(m)) return "T3";
             if (["octubre", "noviembre", "diciembre"].includes(m)) return "T4";
-            return mesTexto; // Si ya viene especificado como "T1", "T2", etc., lo devuelve tal cual
+            return mesTexto;
         }
 
         function descargarExcelFiltrado() {
@@ -209,15 +204,14 @@
                 return;
             }
 
-            // Creamos un nuevo libro de trabajo y una hoja basada únicamente en nuestro arreglo filtrado
             const nuevoLibro = XLSX.utils.book_new();
             const nuevaHoja = XLSX.utils.aoa_to_sheet(datosFiltradosParaGuardar);
             
             XLSX.utils.book_append_sheet(nuevoLibro, nuevaHoja, "Resumen_Trimestral");
 
-            // Forzamos la descarga del nuevo archivo clonado y reducido
-            XLSX.writeFile(nuevoLibro, "Trimestral_" + nombreArchivoOriginal);
-            alert("¡Archivo clonado y filtrado descargado con éxito!");
+            // Guardado siempre como "datos.xlsx"
+            XLSX.writeFile(nuevoLibro, "datos.xlsx");
+            alert("¡Archivo guardado como datos.xlsx con éxito!");
         }
     </script>
 
